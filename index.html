@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Penggajian & Absensi</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Tampilan Mobile Navigation Bottom */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .bottom-nav { display: flex; }
+            .main-content { margin-left: 0; padding-bottom: 90px; }
+        }
+        @media (min-width: 769px) {
+            .sidebar { display: block; width: 250px; position: fixed; height: 100vh; overflow-y: auto; }
+            .bottom-nav { display: none; }
+            .main-content { margin-left: 250px; }
+        }
+
+        /* --- THERMAL PRINTER FIX (CSS) --- */
+        @media print {
+            body > * { display: none !important; }
+            #print-area { 
+                display: block !important; 
+                position: fixed; top: 0; left: 0; width: 100%; 
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 12px; color: black; background: white;
+                z-index: 9999;
+            }
+            #print-area * { visibility: visible; }
+            @page { size: auto; margin: 0; }
+        }
+        
+        #print-area { display: none; }
+        
+        /* Modal Transition */
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow-x: hidden; overflow-y: visible !important; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <!-- Sidebar (Desktop) -->
+    <div class="sidebar bg-blue-900 text-white shadow-lg z-50">
+        <div class="p-6 font-bold text-xl border-b border-blue-800 flex items-center gap-2">
+            <i class="fa-solid fa-wallet"></i> SiGaji
+        </div>
+        <nav class="mt-2 text-sm">
+            <a onclick="nav('dashboard')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-chart-line w-6"></i> Dashboard</a>
+            <a onclick="nav('attendance')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-clipboard-user w-6"></i> Absensi</a>
+            <a onclick="nav('employees')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-users w-6"></i> Karyawan</a>
+            <a onclick="nav('bonus')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-circle-dollar-to-slot w-6"></i> Bonus</a>
+            <a onclick="nav('kasbon')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-money-bill-transfer w-6"></i> Kasbon</a>
+            <a onclick="nav('payroll')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-file-invoice-dollar w-6"></i> Penggajian</a>
+            
+            <div class="mt-4 text-xs uppercase text-blue-400 font-bold px-4">Pengaturan</div>
+            <a onclick="nav('positions')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-briefcase w-6"></i> Jabatan</a>
+            <a onclick="nav('holidays')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-calendar-xmark w-6"></i> Hari Libur</a>
+            <a onclick="nav('profile')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-store w-6"></i> Profil Usaha</a>
+            <a onclick="nav('backup')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-database w-6"></i> Backup & Restore</a>
+            <a onclick="nav('guide')" class="block p-4 hover:bg-blue-800 cursor-pointer border-l-4 border-transparent hover:border-white transition"><i class="fa-solid fa-book w-6"></i> Panduan</a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content p-4 min-h-screen">
+        
+        <!-- Header Mobile -->
+        <div class="md:hidden flex justify-between items-center mb-6 bg-white p-4 rounded shadow">
+            <h1 class="font-bold text-lg text-blue-900"><i class="fa-solid fa-wallet mr-1"></i> SiGaji</h1>
+            <div id="header-date" class="text-xs text-gray-500 font-mono"></div>
+        </div>
+
+        <!-- 1. DASHBOARD -->
+        <div id="dashboard" class="section">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Dashboard</h2>
+            
+            <!-- Filters -->
+            <div class="bg-white p-4 rounded-lg shadow mb-4 border-l-4 border-blue-600">
+                <label class="text-sm font-bold text-gray-600">Filter Statistik:</label>
+                <div class="flex gap-2 mt-2">
+                    <input type="date" id="dash-start" class="border p-2 rounded w-full text-sm bg-gray-50">
+                    <input type="date" id="dash-end" class="border p-2 rounded w-full text-sm bg-gray-50">
+                    <button onclick="renderDashboard()" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded transition"><i class="fa-solid fa-search"></i></button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-6 rounded-lg shadow relative overflow-hidden">
+                    <div class="absolute right-0 top-0 p-4 opacity-10"><i class="fa-solid fa-users text-6xl"></i></div>
+                    <div class="text-gray-500 text-sm font-medium uppercase">Total Karyawan</div>
+                    <div class="text-3xl font-bold text-gray-800 mt-1" id="stat-total-emp">0</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow relative overflow-hidden">
+                    <div class="absolute right-0 top-0 p-4 opacity-10"><i class="fa-solid fa-circle-dollar-to-slot text-6xl text-green-600"></i></div>
+                    <div class="text-gray-500 text-sm font-medium uppercase">Total Bonus</div>
+                    <div class="text-xs text-gray-400 mb-1">(Periode Filter)</div>
+                    <div class="text-2xl font-bold text-green-600" id="stat-total-bonus">Rp 0</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow relative overflow-hidden">
+                    <div class="absolute right-0 top-0 p-4 opacity-10"><i class="fa-solid fa-hand-holding-dollar text-6xl text-red-600"></i></div>
+                    <div class="text-gray-500 text-sm font-medium uppercase">Total Kasbon</div>
+                    <div class="text-xs text-gray-400 mb-1">(Periode Filter)</div>
+                    <div class="text-2xl font-bold text-red-600" id="stat-total-kasbon">Rp 0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. ABSENSI -->
+        <div id="attendance" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Absensi Karyawan</h2>
+            
+            <div class="flex gap-2 mb-4">
+                <button onclick="switchAttTab('input')" id="btn-att-input" class="px-4 py-2 rounded bg-blue-600 text-white font-bold text-sm">Input Absensi</button>
+                <button onclick="switchAttTab('history')" id="btn-att-history" class="px-4 py-2 rounded bg-gray-200 text-gray-600 font-bold text-sm">Riwayat</button>
+            </div>
+
+            <div id="att-input-panel">
+                <div class="bg-white p-4 rounded shadow mb-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <input type="date" id="att-date" class="border p-2 rounded font-bold" onchange="renderAttendanceForm()">
+                        <button onclick="markAllPresent()" class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200">Semua Hadir</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead class="bg-gray-100 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Nama Karyawan</th>
+                                    <th class="p-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-form-list"></tbody>
+                        </table>
+                    </div>
+                    <button onclick="saveAttendance()" class="mt-4 bg-blue-600 text-white px-4 py-3 rounded w-full font-bold shadow hover:bg-blue-700">
+                        <i class="fa-solid fa-save"></i> Simpan Absensi
+                    </button>
+                </div>
+            </div>
+
+            <div id="att-history-panel" class="hidden">
+                <div class="bg-white p-4 rounded shadow mb-4">
+                    <label class="text-xs text-gray-500 font-bold">Filter Tanggal:</label>
+                    <div class="flex gap-2 mt-1">
+                        <input type="date" id="hist-start" class="border p-2 rounded w-full text-sm">
+                        <input type="date" id="hist-end" class="border p-2 rounded w-full text-sm">
+                        <button onclick="renderAttendanceHistory()" class="bg-gray-800 text-white px-3 rounded"><i class="fa-solid fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-gray-100 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">Tanggal</th>
+                                <th class="p-3">Nama</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="att-hist-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. JABATAN -->
+        <div id="positions" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Manajemen Jabatan</h2>
+            <div class="bg-white p-4 rounded shadow mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <input type="text" id="pos-title" placeholder="Nama Jabatan" class="border p-2 rounded">
+                    <input type="number" id="pos-salary" placeholder="Gaji Harian (Rp)" class="border p-2 rounded">
+                    <input type="number" id="pos-meal" placeholder="Uang Makan (Rp)" class="border p-2 rounded">
+                </div>
+                <button onclick="addPosition()" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded w-full md:w-auto">Simpan</button>
+            </div>
+            <div class="bg-white rounded shadow overflow-x-auto">
+                <table class="w-full text-left border-collapse"><tbody id="pos-list"></tbody></table>
+            </div>
+        </div>
+
+        <!-- 4. KARYAWAN -->
+        <div id="employees" class="section hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Manajemen Karyawan</h2>
+                <button onclick="openEmpModal('add')" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700">
+                    <i class="fa-solid fa-user-plus"></i> Tambah
+                </button>
+            </div>
+            
+            <div class="bg-white rounded shadow overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                        <tr>
+                            <th class="p-3">Nama</th>
+                            <th class="p-3">Jabatan</th>
+                            <th class="p-3">No. HP</th>
+                            <th class="p-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emp-list" class="text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 5. BONUS -->
+        <div id="bonus" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Catatan Bonus</h2>
+            <div class="bg-green-50 border-l-4 border-green-500 p-3 mb-4 text-sm text-green-800">
+                <i class="fa-solid fa-circle-info"></i> Bonus akan <b>MENAMBAH</b> total gaji karyawan.
+            </div>
+            <div class="bg-white p-4 rounded shadow mb-4">
+                <div class="grid grid-cols-1 gap-2">
+                    <select id="bonus-emp" class="border p-2 rounded bg-white"><option value="">Pilih Karyawan</option></select>
+                    <input type="date" id="bonus-date" class="border p-2 rounded">
+                    <input type="number" id="bonus-amount" placeholder="Jumlah (Rp)" class="border p-2 rounded">
+                    <input type="text" id="bonus-note" placeholder="Keterangan (Contoh: Lembur, THR)" class="border p-2 rounded">
+                </div>
+                <button onclick="addBonus()" class="mt-2 bg-green-600 text-white px-4 py-2 rounded w-full hover:bg-green-700">
+                    <i class="fa-solid fa-plus"></i> Simpan Bonus
+                </button>
+            </div>
+            <div class="bg-white rounded shadow overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead class="bg-gray-100 uppercase text-xs">
+                        <tr>
+                            <th class="p-3">Tanggal</th>
+                            <th class="p-3">Karyawan</th>
+                            <th class="p-3">Jumlah</th>
+                            <th class="p-3">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bonus-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 6. KASBON -->
+        <div id="kasbon" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Catatan Kasbon</h2>
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 mb-4 text-sm text-red-800">
+                <i class="fa-solid fa-circle-info"></i> Kasbon akan <b>MENGURANGI</b> total gaji karyawan.
+            </div>
+            <div class="bg-white p-4 rounded shadow mb-4">
+                <div class="grid grid-cols-1 gap-2">
+                    <select id="kasbon-emp" class="border p-2 rounded bg-white"><option value="">Pilih Karyawan</option></select>
+                    <input type="date" id="kasbon-date" class="border p-2 rounded">
+                    <input type="number" id="kasbon-amount" placeholder="Jumlah (Rp)" class="border p-2 rounded">
+                    <input type="text" id="kasbon-note" placeholder="Keterangan" class="border p-2 rounded">
+                </div>
+                <button onclick="addKasbon()" class="mt-2 bg-red-500 text-white px-4 py-2 rounded w-full">Simpan Kasbon</button>
+            </div>
+            <div class="bg-white rounded shadow overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm"><tbody id="kasbon-list"></tbody></table>
+            </div>
+        </div>
+
+        <!-- 7. PAYROLL -->
+        <div id="payroll" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Payroll & Slip Gaji</h2>
+            
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 text-sm text-blue-800">
+                <i class="fa-solid fa-calculator"></i> Gaji = (Hadir + Libur Dibayar) + Bonus - Kasbon.
+            </div>
+
+            <div class="bg-white p-4 rounded shadow mb-4">
+                <label class="block mb-2 font-bold text-gray-700">Pilih Periode Penggajian:</label>
+                <div class="flex gap-2">
+                    <input type="date" id="pay-start" class="border p-2 rounded w-full">
+                    <input type="date" id="pay-end" class="border p-2 rounded w-full">
+                </div>
+                <button onclick="calculatePayroll()" class="mt-3 bg-green-600 text-white px-4 py-3 rounded w-full font-bold hover:bg-green-700 shadow-lg transition transform active:scale-95">
+                    <i class="fa-solid fa-calculator"></i> HITUNG GAJI
+                </button>
+            </div>
+
+            <div id="payroll-result" class="hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-lg">Hasil Perhitungan</h3>
+                    <button onclick="exportFullPDF()" class="bg-red-600 text-white text-xs px-3 py-2 rounded hover:bg-red-700 shadow">
+                        <i class="fa-solid fa-file-pdf"></i> Download PDF
+                    </button>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto mb-20">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-gray-200">
+                            <tr>
+                                <th class="p-2">Nama</th>
+                                <th class="p-2">Hari</th>
+                                <th class="p-2">Bonus</th>
+                                <th class="p-2">Kasbon</th>
+                                <th class="p-2">Total Terima</th>
+                                <th class="p-2">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payroll-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. MENU LAINNYA -->
+        <div id="menu_more" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Menu Lainnya</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div onclick="nav('employees')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer border-l-4 border-indigo-500">
+                    <i class="fa-solid fa-users text-3xl text-indigo-600 mb-2"></i>
+                    <span class="font-bold text-sm">Data Karyawan</span>
+                </div>
+                <div onclick="nav('bonus')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer border-l-4 border-green-500">
+                    <i class="fa-solid fa-circle-dollar-to-slot text-3xl text-green-600 mb-2"></i>
+                    <span class="font-bold text-sm">Input Bonus</span>
+                </div>
+                <div onclick="nav('positions')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer border-l-4 border-blue-500">
+                    <i class="fa-solid fa-briefcase text-3xl text-blue-600 mb-2"></i><span class="font-bold text-sm">Jabatan</span>
+                </div>
+                <div onclick="nav('holidays')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer border-l-4 border-red-500">
+                    <i class="fa-solid fa-calendar-xmark text-3xl text-red-500 mb-2"></i><span class="font-bold text-sm">Hari Libur</span>
+                </div>
+                <div onclick="nav('profile')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer"><i class="fa-solid fa-store text-3xl text-gray-600 mb-2"></i><span class="font-bold text-sm">Profil Usaha</span></div>
+                <div onclick="nav('backup')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer"><i class="fa-solid fa-database text-3xl text-orange-500 mb-2"></i><span class="font-bold text-sm">Backup Data</span></div>
+                <div onclick="nav('guide')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer"><i class="fa-solid fa-book text-3xl text-green-600 mb-2"></i><span class="font-bold text-sm">Panduan</span></div>
+                <div onclick="nav('about')" class="bg-white p-4 rounded shadow flex flex-col items-center justify-center cursor-pointer"><i class="fa-solid fa-circle-info text-3xl text-gray-600 mb-2"></i><span class="font-bold text-sm">Tentang</span></div>
+            </div>
+        </div>
+
+        <!-- 9. HARI LIBUR -->
+        <div id="holidays" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Hari Libur</h2>
+            <div class="bg-white p-4 rounded shadow mb-4">
+                <div class="flex gap-2">
+                    <input type="date" id="hol-date" class="border p-2 rounded w-full">
+                    <select id="hol-type" class="border p-2 rounded"><option value="paid">Dibayar (Cuti/Toko Tutup)</option><option value="unpaid">Tidak Dibayar</option></select>
+                </div>
+                <button onclick="addHoliday()" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded w-full">Tambah</button>
+            </div>
+            <ul id="hol-list" class="bg-white rounded shadow divide-y"></ul>
+        </div>
+        
+        <div id="profile" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Profil Usaha</h2>
+            <div class="bg-white p-4 rounded shadow">
+                <div class="grid gap-4">
+                    <input type="text" id="prof-name" placeholder="Nama Usaha" class="border p-2 rounded w-full">
+                    <input type="text" id="prof-owner" placeholder="Pemilik" class="border p-2 rounded w-full">
+                    <input type="text" id="prof-addr" placeholder="Alamat" class="border p-2 rounded w-full">
+                    <input type="text" id="prof-phone" placeholder="No. HP" class="border p-2 rounded w-full">
+                </div>
+                <button onclick="saveProfile()" class="mt-6 bg-blue-600 text-white px-4 py-2 rounded w-full">Simpan</button>
+            </div>
+        </div>
+
+        <div id="backup" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Backup & Restore</h2>
+            <div class="bg-white p-6 rounded shadow mb-4">
+                <button onclick="downloadBackup()" class="bg-blue-600 text-white px-4 py-2 rounded w-full">Download Backup (.json)</button>
+            </div>
+            <div class="bg-white p-6 rounded shadow">
+                <p class="text-sm mb-2">Restore File:</p>
+                <input type="file" id="restore-file" accept=".json" class="w-full text-sm" onchange="restoreBackup(event)">
+            </div>
+        </div>
+
+        <div id="guide" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Panduan</h2>
+            <div class="bg-white p-4 rounded shadow text-sm">
+                <p class="mb-2"><b>1. Bonus:</b> Gunakan menu Bonus untuk menambahkan pendapatan di luar gaji pokok (Lembur, THR).</p>
+                <p class="mb-2"><b>2. Kasbon:</b> Gunakan menu Kasbon untuk mencatat pinjaman (mengurangi gaji).</p>
+                <p class="mb-2"><b>3. Gaji:</b> Bonus otomatis ditambahkan dan Kasbon otomatis dikurangkan saat hitung gaji.</p>
+            </div>
+        </div>
+
+        <div id="about" class="section hidden">
+            <h2 class="text-2xl font-bold mb-4">Tentang</h2>
+            <div class="bg-white p-6 rounded text-center">
+                <h3 class="font-bold text-blue-900">SiGaji App</h3>
+                <p class="text-gray-500 text-sm mb-4">Versi 1.5.0</p>
+                <a href="https://wa.me/6282252802996" target="_blank" class="bg-green-500 text-white py-2 px-4 rounded block">WA: 0822-5280-2996</a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL: ADD/EDIT EMPLOYEE -->
+    <div id="modal-emp" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" aria-hidden="true" onclick="closeEmpModal()"></div>
+            <div class="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4" id="modal-emp-title">Form Karyawan</h3>
+                <input type="hidden" id="emp-id">
+                <div class="grid gap-3">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">Nama Lengkap</label>
+                        <input type="text" id="emp-name" class="border p-2 rounded w-full">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">Tanggal Masuk</label>
+                        <input type="date" id="emp-join" class="border p-2 rounded w-full">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">Jabatan</label>
+                        <select id="emp-pos" class="border p-2 rounded w-full"></select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">No. HP</label>
+                        <input type="text" id="emp-phone" class="border p-2 rounded w-full">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">Alamat</label>
+                        <input type="text" id="emp-addr" class="border p-2 rounded w-full">
+                    </div>
+                </div>
+                <div class="mt-5 flex gap-2">
+                    <button onclick="closeEmpModal()" class="w-full bg-gray-200 text-gray-800 p-2 rounded">Batal</button>
+                    <button onclick="saveEmployee()" class="w-full bg-blue-600 text-white p-2 rounded">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: VIEW EMPLOYEE DETAIL -->
+    <div id="modal-emp-detail" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeDetailModal()"></div>
+            <div class="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl relative">
+                <button onclick="closeDetailModal()" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times text-xl"></i></button>
+                
+                <div class="text-center mb-6">
+                    <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2 text-3xl">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900" id="detail-name">Nama Karyawan</h3>
+                    <p class="text-sm text-gray-500" id="detail-job">Jabatan</p>
+                </div>
+
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500">Tanggal Masuk</span>
+                        <span class="font-medium" id="detail-join">-</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500">Lama Bekerja</span>
+                        <span class="font-medium" id="detail-tenure">-</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500">No. HP</span>
+                        <span class="font-medium" id="detail-phone">-</span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-500">Alamat</span>
+                        <span class="font-medium text-right w-1/2" id="detail-addr">-</span>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-3 rounded mt-4">
+                        <p class="text-xs font-bold text-gray-500 uppercase mb-2">Info Gaji Saat Ini</p>
+                        <div class="flex justify-between mb-1">
+                            <span>Gaji Harian</span>
+                            <span class="font-bold text-green-600" id="detail-salary">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Uang Makan</span>
+                            <span class="font-bold text-green-600" id="detail-meal">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button onclick="closeDetailModal()" class="w-full bg-blue-600 text-white p-2 rounded font-bold">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav fixed bottom-0 w-full bg-white border-t flex justify-around p-2 text-xs text-gray-600 z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
+        <div onclick="nav('dashboard')" class="text-center cursor-pointer p-2 w-full hover:text-blue-600"><i class="fa-solid fa-house block text-xl mb-1"></i>Home</div>
+        <div onclick="nav('attendance')" class="text-center cursor-pointer p-2 w-full hover:text-blue-600"><i class="fa-solid fa-clipboard-user block text-xl mb-1"></i>Absen</div>
+        <div onclick="nav('kasbon')" class="text-center cursor-pointer p-2 w-full hover:text-blue-600"><i class="fa-solid fa-money-bill-transfer block text-xl mb-1"></i>Kasbon</div>
+        <div onclick="nav('payroll')" class="text-center cursor-pointer p-2 w-full hover:text-blue-600"><i class="fa-solid fa-file-invoice-dollar block text-xl mb-1"></i>Gaji</div>
+        <div onclick="nav('menu_more')" class="text-center cursor-pointer p-2 w-full hover:text-blue-600"><i class="fa-solid fa-bars block text-xl mb-1"></i>Menu</div>
+    </div>
+
+    <div id="print-area"></div>
+
+    <script>
+        // --- DATA STORE ---
+        let db = {
+            positions: JSON.parse(localStorage.getItem('positions')) || [],
+            employees: JSON.parse(localStorage.getItem('employees')) || [],
+            holidays: JSON.parse(localStorage.getItem('holidays')) || [],
+            kasbon: JSON.parse(localStorage.getItem('kasbon')) || [],
+            bonuses: JSON.parse(localStorage.getItem('bonuses')) || [],
+            attendance: JSON.parse(localStorage.getItem('attendance')) || [],
+            profile: JSON.parse(localStorage.getItem('profile')) || { name: "Nama Usaha", owner: "Pemilik", address: "Alamat", phone: "08123456789" }
+        };
+
+        const save = () => {
+            localStorage.setItem('positions', JSON.stringify(db.positions));
+            localStorage.setItem('employees', JSON.stringify(db.employees));
+            localStorage.setItem('holidays', JSON.stringify(db.holidays));
+            localStorage.setItem('kasbon', JSON.stringify(db.kasbon));
+            localStorage.setItem('bonuses', JSON.stringify(db.bonuses));
+            localStorage.setItem('attendance', JSON.stringify(db.attendance));
+            localStorage.setItem('profile', JSON.stringify(db.profile));
+        };
+
+        const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+        const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+        // --- NAVIGATION ---
+        function nav(sectionId) {
+            document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(sectionId);
+            if(target) target.classList.remove('hidden');
+            
+            if(sectionId === 'dashboard') renderDashboard();
+            if(sectionId === 'positions') renderPositions();
+            if(sectionId === 'employees') renderEmployees();
+            if(sectionId === 'holidays') renderHolidays();
+            
+            // FIX: Ensure dropdowns are populated when navigating to these sections
+            if(sectionId === 'kasbon') {
+                renderKasbon();
+                updateSelectOptions(); 
+            }
+            if(sectionId === 'bonus') {
+                renderBonuses();
+                updateSelectOptions();
+            }
+            
+            if(sectionId === 'attendance') {
+                document.getElementById('att-date').value = new Date().toISOString().split('T')[0];
+                renderAttendanceForm();
+            }
+            if(sectionId === 'profile') loadProfile();
+            window.scrollTo(0,0);
+        }
+
+        // --- HELPER: UPDATE DROPDOWNS ---
+        function updateSelectOptions() {
+            const options = '<option value="">Pilih Karyawan</option>' + db.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+            const kSelect = document.getElementById('kasbon-emp');
+            const bSelect = document.getElementById('bonus-emp');
+            if(kSelect) kSelect.innerHTML = options;
+            if(bSelect) bSelect.innerHTML = options;
+        }
+
+        // --- ATTENDANCE ---
+        function switchAttTab(tab) {
+            document.getElementById('att-input-panel').classList.add('hidden');
+            document.getElementById('att-history-panel').classList.add('hidden');
+            document.getElementById('btn-att-input').className = "px-4 py-2 rounded font-bold text-sm " + (tab === 'input' ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600");
+            document.getElementById('btn-att-history').className = "px-4 py-2 rounded font-bold text-sm " + (tab === 'history' ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600");
+            
+            if(tab === 'input') {
+                document.getElementById('att-input-panel').classList.remove('hidden');
+                renderAttendanceForm();
+            } else {
+                document.getElementById('att-history-panel').classList.remove('hidden');
+                renderAttendanceHistory();
+            }
+        }
+
+        function renderAttendanceForm() {
+            const date = document.getElementById('att-date').value;
+            const tbody = document.getElementById('att-form-list');
+            tbody.innerHTML = db.employees.map(emp => {
+                const exist = db.attendance.find(a => a.empId === emp.id && a.date === date);
+                const status = exist ? exist.status : 'hadir';
+                return `
+                <tr class="border-b bg-gray-50">
+                    <td class="p-3 font-medium">${emp.name}</td>
+                    <td class="p-3">
+                        <select id="att-status-${emp.id}" class="border p-2 rounded w-full text-sm bg-white">
+                            <option value="hadir" ${status === 'hadir' ? 'selected' : ''}>Hadir</option>
+                            <option value="sakit" ${status === 'sakit' ? 'selected' : ''}>Sakit</option>
+                            <option value="izin" ${status === 'izin' ? 'selected' : ''}>Izin</option>
+                            <option value="alpha" ${status === 'alpha' ? 'selected' : ''}>Alpha</option>
+                        </select>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function markAllPresent() {
+            db.employees.forEach(emp => {
+                const el = document.getElementById(`att-status-${emp.id}`);
+                if(el) el.value = 'hadir';
+            });
+        }
+
+        function saveAttendance() {
+            const date = document.getElementById('att-date').value;
+            if(!date) return alert('Pilih tanggal');
+            db.attendance = db.attendance.filter(a => a.date !== date);
+            db.employees.forEach(emp => {
+                const status = document.getElementById(`att-status-${emp.id}`).value;
+                db.attendance.push({ id: generateId(), date: date, empId: emp.id, status: status });
+            });
+            save(); alert('Absensi berhasil disimpan!');
+        }
+
+        function renderAttendanceHistory() {
+            let start = document.getElementById('hist-start').value;
+            let end = document.getElementById('hist-end').value;
+            if(!start) {
+                const d = new Date();
+                start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+                end = new Date().toISOString().split('T')[0];
+                document.getElementById('hist-start').value = start;
+                document.getElementById('hist-end').value = end;
+            }
+            const filtered = db.attendance.filter(a => a.date >= start && a.date <= end).sort((a,b) => b.date.localeCompare(a.date));
+            document.getElementById('att-hist-list').innerHTML = filtered.map(a => {
+                const emp = db.employees.find(e => e.id === a.empId) || {name: '?'};
+                return `<tr class="border-b hover:bg-gray-50"><td class="p-3 whitespace-nowrap">${a.date}</td><td class="p-3">${emp.name}</td><td class="p-3 capitalize">${a.status}</td><td class="p-3"><button onclick="deleteItem('attendance', '${a.id}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            }).join('');
+        }
+
+        // --- DASHBOARD ---
+        function renderDashboard() {
+            document.getElementById('header-date').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+            document.getElementById('stat-total-emp').innerText = db.employees.length;
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('stat-today-att').innerText = db.attendance.filter(a => a.date === today && a.status === 'hadir').length;
+
+            let start = document.getElementById('dash-start').value;
+            let end = document.getElementById('dash-end').value;
+            if(!start) {
+                const d = new Date();
+                start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+                end = new Date().toISOString().split('T')[0];
+                document.getElementById('dash-start').value = start;
+                document.getElementById('dash-end').value = end;
+            }
+            
+            const totalKasbon = db.kasbon.filter(k => k.date >= start && k.date <= end).reduce((sum, k) => sum + k.amount, 0);
+            document.getElementById('stat-total-kasbon').innerText = formatRp(totalKasbon);
+
+            const totalBonus = db.bonuses.filter(b => b.date >= start && b.date <= end).reduce((sum, b) => sum + b.amount, 0);
+            document.getElementById('stat-total-bonus').innerText = formatRp(totalBonus);
+        }
+
+        // --- PAYROLL LOGIC ---
+        let payrollData = [];
+
+        function calculatePayroll() {
+            const start = document.getElementById('pay-start').value;
+            const end = document.getElementById('pay-end').value;
+            
+            if(!start || !end) return alert('Pilih rentang tanggal');
+
+            payrollData = db.employees.map(emp => {
+                const pos = db.positions.find(p => p.id === emp.posId) || { salary: 0, meal: 0, title: '' };
+                
+                const presentDates = db.attendance
+                    .filter(a => a.empId === emp.id && a.date >= start && a.date <= end && a.status === 'hadir')
+                    .map(a => a.date);
+                
+                const paidHolidayDates = db.holidays
+                    .filter(h => h.date >= start && h.date <= end && h.type === 'paid')
+                    .map(h => h.date);
+
+                const uniquePaidDays = new Set([...presentDates, ...paidHolidayDates]);
+                const totalPaidDays = uniquePaidDays.size;
+
+                const empKasbon = db.kasbon
+                    .filter(k => k.empId === emp.id && k.date >= start && k.date <= end)
+                    .reduce((sum, k) => sum + k.amount, 0);
+
+                const empBonus = db.bonuses
+                    .filter(b => b.empId === emp.id && b.date >= start && b.date <= end)
+                    .reduce((sum, b) => sum + b.amount, 0);
+
+                const basicTotal = totalPaidDays * pos.salary;
+                const mealTotal = totalPaidDays * pos.meal;
+                const gross = basicTotal + mealTotal;
+                const net = gross + empBonus - empKasbon;
+
+                return { emp, pos, paidDays: totalPaidDays, gross, kasbon: empKasbon, bonus: empBonus, net, start, end };
+            });
+
+            renderPayrollTable();
+        }
+
+        function renderPayrollTable() {
+            document.getElementById('payroll-result').classList.remove('hidden');
+            document.getElementById('payroll-list').innerHTML = payrollData.map((d, index) => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-2 font-bold">${d.emp.name}<br><span class="text-xs font-normal text-gray-500">${d.pos.title}</span></td>
+                    <td class="p-2 text-center bg-blue-50 font-bold">${d.paidDays}</td>
+                    <td class="p-2 text-green-600 font-bold">${formatRp(d.bonus)}</td>
+                    <td class="p-2 text-red-600">${formatRp(d.kasbon)}</td>
+                    <td class="p-2 font-bold text-blue-900">${formatRp(d.net)}</td>
+                    <td class="p-2">
+                        <button onclick="printSlip(${index})" class="bg-gray-800 text-white px-2 py-1 rounded text-xs shadow"><i class="fa-solid fa-print"></i> Slip</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- CRUD FUNCTIONS ---
+        function addPosition() {
+            const title = document.getElementById('pos-title').value;
+            const salary = Number(document.getElementById('pos-salary').value);
+            const meal = Number(document.getElementById('pos-meal').value);
+            if (!title) return alert('Nama jabatan wajib diisi');
+            db.positions.push({ id: generateId(), title, salary, meal });
+            save(); renderPositions();
+            document.getElementById('pos-title').value = '';
+        }
+        function renderPositions() {
+            document.getElementById('pos-list').innerHTML = db.positions.map(p => `
+                <tr class="border-b"><td class="p-3">${p.title}</td><td class="p-3">${formatRp(p.salary)}</td><td class="p-3">${formatRp(p.meal)}</td><td class="p-3"><button onclick="deleteItem('positions','${p.id}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button></td></tr>
+            `).join('');
+            document.getElementById('emp-pos').innerHTML = '<option value="">Pilih Jabatan</option>' + db.positions.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+        }
+
+        // --- EMPLOYEE CRUD ---
+        function openEmpModal(mode, id = null) {
+            document.getElementById('modal-emp').classList.remove('hidden');
+            const posSelect = document.getElementById('emp-pos');
+            posSelect.innerHTML = '<option value="">Pilih Jabatan</option>' + 
+                db.positions.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+
+            if(mode === 'edit' && id) {
+                const emp = db.employees.find(e => e.id === id);
+                if(emp) {
+                    document.getElementById('modal-emp-title').innerText = "Edit Karyawan";
+                    document.getElementById('emp-id').value = emp.id;
+                    document.getElementById('emp-name').value = emp.name;
+                    document.getElementById('emp-join').value = emp.join;
+                    document.getElementById('emp-pos').value = emp.posId;
+                    document.getElementById('emp-phone').value = emp.phone;
+                    document.getElementById('emp-addr').value = emp.addr;
+                }
+            } else {
+                document.getElementById('modal-emp-title').innerText = "Tambah Karyawan";
+                document.getElementById('emp-id').value = '';
+                document.getElementById('emp-name').value = '';
+                document.getElementById('emp-join').value = '';
+                document.getElementById('emp-pos').value = '';
+                document.getElementById('emp-phone').value = '';
+                document.getElementById('emp-addr').value = '';
+            }
+        }
+
+        function closeEmpModal() {
+            document.getElementById('modal-emp').classList.add('hidden');
+        }
+
+        function saveEmployee() {
+            const id = document.getElementById('emp-id').value;
+            const name = document.getElementById('emp-name').value;
+            const posId = document.getElementById('emp-pos').value;
+            const join = document.getElementById('emp-join').value;
+            const phone = document.getElementById('emp-phone').value;
+            const addr = document.getElementById('emp-addr').value;
+
+            if (!name || !posId || !join) return alert('Data wajib belum lengkap');
+
+            if(id) {
+                const index = db.employees.findIndex(e => e.id === id);
+                if(index !== -1) {
+                    db.employees[index] = { id, name, posId, join, phone, addr };
+                    alert('Data karyawan diperbarui');
+                }
+            } else {
+                db.employees.push({ id: generateId(), name, posId, join, phone, addr });
+                alert('Karyawan baru ditambahkan');
+            }
+            save(); renderEmployees(); closeEmpModal();
+        }
+
+        function renderEmployees() {
+            document.getElementById('emp-list').innerHTML = db.employees.map(e => {
+                const pos = db.positions.find(p => p.id === e.posId) || { title: '?' };
+                return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3"><div class="font-bold text-blue-900">${e.name}</div></td>
+                    <td class="p-3 text-sm">${pos.title}</td>
+                    <td class="p-3 text-xs">${e.phone}</td>
+                    <td class="p-3 text-center flex justify-center gap-2">
+                        <button onclick="viewEmployee('${e.id}')" class="text-blue-500 bg-blue-50 p-2 rounded hover:bg-blue-100"><i class="fa-solid fa-eye"></i></button>
+                        <button onclick="openEmpModal('edit', '${e.id}')" class="text-yellow-500 bg-yellow-50 p-2 rounded hover:bg-yellow-100"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteItem('employees','${e.id}')" class="text-red-500 bg-red-50 p-2 rounded hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `}).join('');
+            
+            updateSelectOptions();
+        }
+
+        // --- VIEW EMPLOYEE DETAIL ---
+        function viewEmployee(id) {
+            const emp = db.employees.find(e => e.id === id);
+            if(!emp) return;
+            const pos = db.positions.find(p => p.id === emp.posId) || { title: '-', salary: 0, meal: 0 };
+            const joinDate = new Date(emp.join);
+            const now = new Date();
+            const diffTime = Math.abs(now - joinDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            let tenure = `${diffDays} hari`;
+            if(diffDays > 365) tenure = `${Math.floor(diffDays/365)} tahun`;
+
+            document.getElementById('detail-name').innerText = emp.name;
+            document.getElementById('detail-job').innerText = pos.title;
+            document.getElementById('detail-join').innerText = emp.join;
+            document.getElementById('detail-tenure').innerText = tenure;
+            document.getElementById('detail-phone').innerText = emp.phone || '-';
+            document.getElementById('detail-addr').innerText = emp.addr || '-';
+            document.getElementById('detail-salary').innerText = formatRp(pos.salary);
+            document.getElementById('detail-meal').innerText = formatRp(pos.meal);
+
+            document.getElementById('modal-emp-detail').classList.remove('hidden');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('modal-emp-detail').classList.add('hidden');
+        }
+
+        // --- OTHER CRUD (KASBON, BONUS, HOLIDAY) ---
+        function addKasbon() {
+            const empId = document.getElementById('kasbon-emp').value;
+            const date = document.getElementById('kasbon-date').value;
+            const amount = Number(document.getElementById('kasbon-amount').value);
+            const note = document.getElementById('kasbon-note').value;
+            if(!empId || !amount) return alert('Data kasbon belum lengkap');
+            db.kasbon.push({ id: generateId(), empId, date, amount, note });
+            save(); renderKasbon();
+            
+            // Reset fields
+            document.getElementById('kasbon-amount').value = '';
+            document.getElementById('kasbon-note').value = '';
+        }
+        function renderKasbon() {
+            document.getElementById('kasbon-list').innerHTML = db.kasbon.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(k => {
+                const emp = db.employees.find(e => e.id === k.empId) || {name:'?'};
+                return `<tr class="border-b"><td class="p-3 text-xs">${k.date}</td><td class="p-3">${emp.name}<br><span class="text-xs text-gray-400">${k.note}</span></td><td class="p-3 text-red-600">${formatRp(k.amount)}</td><td class="p-3"><button onclick="deleteItem('kasbon','${k.id}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            }).join('');
+        }
+
+        function addBonus() {
+            const empId = document.getElementById('bonus-emp').value;
+            const date = document.getElementById('bonus-date').value;
+            const amount = Number(document.getElementById('bonus-amount').value);
+            const note = document.getElementById('bonus-note').value;
+            if(!empId || !amount) return alert('Data bonus belum lengkap');
+            db.bonuses.push({ id: generateId(), empId, date, amount, note });
+            save(); renderBonuses();
+            alert('Bonus berhasil ditambahkan');
+            
+            // Reset fields
+            document.getElementById('bonus-amount').value = '';
+            document.getElementById('bonus-note').value = '';
+        }
+        function renderBonuses() {
+            document.getElementById('bonus-list').innerHTML = db.bonuses.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(b => {
+                const emp = db.employees.find(e => e.id === b.empId) || {name:'?'};
+                return `<tr class="border-b"><td class="p-3 text-xs">${b.date}</td><td class="p-3">${emp.name}<br><span class="text-xs text-green-600">${b.note}</span></td><td class="p-3 text-green-600 font-bold">${formatRp(b.amount)}</td><td class="p-3"><button onclick="deleteItem('bonuses','${b.id}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            }).join('');
+        }
+
+        function addHoliday() {
+            const date = document.getElementById('hol-date').value;
+            const type = document.getElementById('hol-type').value;
+            if(!date) return alert('Pilih tanggal');
+            db.holidays.push({ id: generateId(), date, type });
+            save(); renderHolidays();
+            document.getElementById('hol-date').value = '';
+            alert('Hari libur ditambahkan');
+        }
+        function renderHolidays() {
+            document.getElementById('hol-list').innerHTML = db.holidays.sort((a,b) => new Date(b.date) - new Date(a.date)).map(h => `
+                <li class="p-3 flex justify-between items-center border-b last:border-0">
+                    <div>
+                        <div class="font-bold text-gray-700">${h.date}</div>
+                        <div class="text-xs ${h.type === 'paid' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'} px-2 py-1 rounded inline-block">
+                            ${h.type === 'paid' ? 'Dibayar (Cuti/Toko Tutup)' : 'Tidak Dibayar'}
+                        </div>
+                    </div>
+                    <button onclick="deleteItem('holidays', '${h.id}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button>
+                </li>
+            `).join('');
+        }
+
+        function deleteItem(type, id) {
+            if(confirm('Hapus data ini?')) {
+                db[type] = db[type].filter(i => i.id !== id);
+                save();
+                if(type === 'positions') renderPositions();
+                if(type === 'employees') renderEmployees();
+                if(type === 'kasbon') renderKasbon();
+                if(type === 'bonuses') renderBonuses();
+                if(type === 'holidays') renderHolidays();
+                if(type === 'attendance') renderAttendanceHistory();
+            }
+        }
+
+        // --- BACKUP & RESTORE ---
+        function loadProfile() {
+            document.getElementById('prof-name').value = db.profile.name;
+            document.getElementById('prof-owner').value = db.profile.owner;
+            document.getElementById('prof-addr').value = db.profile.address;
+            document.getElementById('prof-phone').value = db.profile.phone;
+        }
+        function saveProfile() {
+            db.profile = {
+                name: document.getElementById('prof-name').value,
+                owner: document.getElementById('prof-owner').value,
+                address: document.getElementById('prof-addr').value,
+                phone: document.getElementById('prof-phone').value,
+            };
+            save(); alert('Profil tersimpan');
+        }
+        function downloadBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const node = document.createElement('a');
+            node.setAttribute("href", dataStr);
+            node.setAttribute("download", "backup_payroll_" + new Date().toISOString().slice(0,10) + ".json");
+            document.body.appendChild(node); node.click(); node.remove();
+        }
+        function restoreBackup(event) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try { db = JSON.parse(e.target.result); save(); alert("Restore Sukses"); location.reload(); } 
+                catch(err) { alert("File rusak"); }
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+        
+        // --- PRINT ---
+        function printSlip(index) {
+            const data = payrollData[index];
+            const p = db.profile;
+            const dateNow = new Date().toLocaleString('id-ID');
+
+            const html = `
+                <div style="width: 58mm; padding: 5px; font-family: monospace; font-size: 12px; line-height: 1.2;">
+                    <div style="text-align:center; font-weight:bold; font-size: 14px; margin-bottom:5px;">${p.name}</div>
+                    <div style="text-align:center; font-size:10px; margin-bottom:10px;">${p.address}<br>${p.phone}</div>
+                    <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+                    <div style="margin: 5px 0;">
+                        SLIP GAJI<br>
+                        Karyawan: <b>${data.emp.name}</b><br>
+                        Periode: ${data.start} s/d ${data.end}
+                    </div>
+                    <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+                    <table style="width:100%; font-size:12px; border-collapse: collapse;">
+                        <tr><td>Hari Kerja (${data.paidDays})</td><td style="text-align:right;">${formatRp(data.paidDays * data.pos.salary)}</td></tr>
+                        <tr><td>Uang Makan</td><td style="text-align:right;">${formatRp(data.paidDays * data.pos.meal)}</td></tr>
+                        <tr><td>Bonus/THR</td><td style="text-align:right;">${formatRp(data.bonus)}</td></tr>
+                        <tr><td>Pot. Kasbon</td><td style="text-align:right;">-${formatRp(data.kasbon)}</td></tr>
+                    </table>
+                    <div style="border-top: 1px solid black; margin: 5px 0;"></div>
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size: 14px;">
+                        <span>TOTAL:</span>
+                        <span>${formatRp(data.net)}</span>
+                    </div>
+                    <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+                    <div style="text-align:center; margin-top:15px; font-size:10px;">
+                        Diterima Oleh,<br><br><br>
+                        (${data.emp.name})
+                    </div>
+                    <div style="text-align:center; font-size:9px; margin-top:5px;">Cetak: ${dateNow}</div>
+                    <br><br>
+                </div>
+            `;
+
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = html;
+            setTimeout(() => { window.print(); }, 500);
+        }
+
+        function exportFullPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text(`Laporan Gaji: ${db.profile.name}`, 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Periode: ${document.getElementById('pay-start').value} s/d ${document.getElementById('pay-end').value}`, 14, 22);
+            const rows = payrollData.map(d => [d.emp.name, d.pos.title, d.paidDays + " Hari", formatRp(d.gross), formatRp(d.bonus), formatRp(d.kasbon), formatRp(d.net)]);
+            doc.autoTable({ head: [["Nama", "Jabatan", "Hari Kerja", "Gaji Bruto", "Bonus", "Kasbon", "Total Terima"]], body: rows, startY: 30 });
+            doc.save(`Laporan_Gaji_${Date.now()}.pdf`);
+        }
+
+        // Init
+        nav('dashboard');
+    </script>
+</body>
+</html>
