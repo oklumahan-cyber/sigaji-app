@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SiGaji App</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-512.png">
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Poppins', 'sans-serif'] },
+                    colors: {
+                        primary: '#4f46e5', // Indigo 600
+                        secondary: '#818cf8', // Indigo 400
+                        dark: '#1e1b4b',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* --- GLOBAL STYLES --- */
+        body { -webkit-tap-highlight-color: transparent; background-color: #f3f4f6; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Animations */
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .page-enter { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .modal-enter { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .fade-enter { animation: fadeIn 0.3s ease-out; }
+
+        /* Interactive Elements */
+        .btn-press { transition: transform 0.1s; }
+        .btn-press:active { transform: scale(0.95); }
+        
+        /* Glassmorphism */
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .glass-dark { background: rgba(30, 27, 75, 0.95); backdrop-filter: blur(10px); }
+
+        /* Layout Fixes */
+        .content-wrapper { padding-bottom: 100px; }
+        @media (min-width: 769px) { 
+            .sidebar { width: 260px; }
+            .main-content { margin-left: 260px; padding-bottom: 20px; }
+        }
+
+        /* Thermal Printer */
+        @media print {
+            body > * { display: none !important; }
+            #print-area { display: block !important; position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 9999; }
+            #print-area * { visibility: visible; }
+            @page { size: auto; margin: 0; }
+        }
+        #print-area { display: none; }
+    </style>
+</head>
+<body class="text-gray-700 antialiased select-none">
+
+    <!-- DESKTOP SIDEBAR -->
+    <div class="sidebar fixed h-full glass-dark text-white shadow-2xl z-50 hidden md:block transition-all">
+        <div class="p-8 border-b border-indigo-900 flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/50">
+                <i class="fa-solid fa-wallet text-white"></i>
+            </div>
+            <h1 class="font-bold text-xl tracking-wide">SiGaji<span class="text-indigo-400">App</span></h1>
+        </div>
+        <nav class="mt-6 px-4 space-y-2">
+            <a onclick="nav('dashboard')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-chart-pie w-6"></i> Dashboard</a>
+            <a onclick="nav('attendance')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-clipboard-user w-6"></i> Absensi</a>
+            <a onclick="nav('employees')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-users w-6"></i> Karyawan</a>
+            <a onclick="nav('bonus')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-gift w-6"></i> Bonus</a>
+            <a onclick="nav('kasbon')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-money-bill-transfer w-6"></i> Kasbon</a>
+            <a onclick="nav('payroll')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-file-invoice-dollar w-6"></i> Penggajian</a>
+            
+            <div class="pt-4 pb-2 text-xs font-bold text-indigo-400 uppercase tracking-wider px-3">Settings</div>
+            <a onclick="nav('positions')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-briefcase w-6"></i> Jabatan</a>
+            <a onclick="nav('holidays')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-calendar-day w-6"></i> Hari Libur</a>
+            <a onclick="nav('profile')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-store w-6"></i> Profil</a>
+            <a onclick="nav('backup')" class="nav-item block p-3 rounded-xl hover:bg-white/10 cursor-pointer transition flex items-center gap-3"><i class="fa-solid fa-database w-6"></i> Backup</a>
+        </nav>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content min-h-screen content-wrapper">
+        
+        <!-- Mobile Header -->
+        <div class="md:hidden glass sticky top-0 z-40 px-6 py-4 shadow-sm flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-wallet text-sm"></i>
+                </div>
+                <h1 class="font-bold text-lg text-dark">SiGaji<span class="text-primary">App</span></h1>
+            </div>
+            <div id="header-date" class="text-[10px] font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-full"></div>
+        </div>
+
+        <div class="p-4 md:p-8 max-w-7xl mx-auto">
+            
+            <!-- 1. DASHBOARD -->
+            <div id="dashboard" class="section page-enter">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-dark">Overview</h2>
+                        <p class="text-sm text-gray-500">Ringkasan data perusahaan Anda</p>
+                    </div>
+                    <button onclick="renderDashboard()" class="btn-press bg-white text-gray-600 p-2 rounded-full shadow hover:text-primary"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+
+                <!-- Date Filter -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-3 items-center">
+                    <div class="flex items-center gap-2 w-full">
+                        <i class="fa-regular fa-calendar text-gray-400"></i>
+                        <input type="date" id="dash-start" class="border-none bg-gray-50 rounded-lg text-sm w-full focus:ring-2 focus:ring-primary/50">
+                    </div>
+                    <span class="text-gray-300">to</span>
+                    <div class="flex items-center gap-2 w-full">
+                        <i class="fa-regular fa-calendar text-gray-400"></i>
+                        <input type="date" id="dash-end" class="border-none bg-gray-50 rounded-lg text-sm w-full focus:ring-2 focus:ring-primary/50">
+                    </div>
+                    <button onclick="renderDashboard()" class="btn-press bg-primary text-white px-4 py-2 rounded-xl shadow-lg shadow-primary/30 w-full md:w-auto"><i class="fa-solid fa-filter"></i></button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-lg shadow-blue-500/20 text-white relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 opacity-20 text-8xl"><i class="fa-solid fa-users"></i></div>
+                        <p class="text-blue-100 text-xs font-medium uppercase tracking-wider">Total Karyawan</p>
+                        <h3 class="text-3xl font-bold mt-1" id="stat-total-emp">0</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-lg shadow-emerald-500/20 text-white relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 opacity-20 text-8xl"><i class="fa-solid fa-circle-check"></i></div>
+                        <p class="text-emerald-100 text-xs font-medium uppercase tracking-wider">Hadir Hari Ini</p>
+                        <h3 class="text-3xl font-bold mt-1" id="stat-today-att">0</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-gray-400 text-xs font-bold uppercase">Total Bonus</p>
+                                <h3 class="text-xl font-bold text-green-600 mt-1" id="stat-total-bonus">Rp 0</h3>
+                            </div>
+                            <div class="p-2 bg-green-50 rounded-lg text-green-600"><i class="fa-solid fa-gift"></i></div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-gray-400 text-xs font-bold uppercase">Total Kasbon</p>
+                                <h3 class="text-xl font-bold text-red-600 mt-1" id="stat-total-kasbon">Rp 0</h3>
+                            </div>
+                            <div class="p-2 bg-red-50 rounded-lg text-red-600"><i class="fa-solid fa-money-bill-wave"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ABSENSI -->
+            <div id="attendance" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold text-dark mb-4">Absensi</h2>
+                
+                <div class="bg-white p-1 rounded-xl inline-flex shadow-sm mb-6 w-full md:w-auto">
+                    <button onclick="switchAttTab('input')" id="btn-att-input" class="flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-medium transition-all">Input Harian</button>
+                    <button onclick="switchAttTab('history')" id="btn-att-history" class="flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-primary transition-all">Riwayat</button>
+                </div>
+
+                <div id="att-input-panel" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <input type="date" id="att-date" class="bg-gray-50 border-none rounded-lg text-sm font-bold text-gray-700" onchange="renderAttendanceForm()">
+                        <button onclick="markAllPresent()" class="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-bold hover:bg-emerald-200 transition">Semua Hadir</button>
+                    </div>
+                    <div class="space-y-3" id="att-form-list"></div>
+                    <button onclick="saveAttendance()" class="btn-press mt-6 w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition">Simpan Absensi</button>
+                </div>
+
+                <div id="att-history-panel" class="hidden">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm mb-4 flex gap-2">
+                        <input type="date" id="hist-start" class="w-full bg-gray-50 border-none rounded-lg text-sm">
+                        <input type="date" id="hist-end" class="w-full bg-gray-50 border-none rounded-lg text-sm">
+                        <button onclick="renderAttendanceHistory()" class="bg-dark text-white px-4 rounded-lg"><i class="fa-solid fa-search"></i></button>
+                    </div>
+                    <div class="space-y-3" id="att-hist-list"></div>
+                </div>
+            </div>
+
+            <!-- 3. KARYAWAN -->
+            <div id="employees" class="section hidden page-enter">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-dark">Karyawan</h2>
+                    <button onclick="openEmpModal('add')" class="btn-press bg-primary text-white px-4 py-2 rounded-xl shadow-lg shadow-indigo-500/30 flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> <span class="hidden md:inline">Tambah</span>
+                    </button>
+                </div>
+
+                <div class="relative mb-6">
+                    <i class="fa-solid fa-search absolute left-4 top-3.5 text-gray-400"></i>
+                    <input type="text" id="emp-search" placeholder="Cari nama atau NIK..." class="w-full pl-10 pr-4 py-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-primary/50" onkeyup="renderEmployees()">
+                </div>
+
+                <!-- Active Filter Tabs -->
+                <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+                    <button class="px-4 py-1.5 rounded-full text-xs font-bold bg-dark text-white whitespace-nowrap">Semua</button>
+                    <button class="px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-500 border border-gray-200 whitespace-nowrap">Aktif</button>
+                    <button class="px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-500 border border-gray-200 whitespace-nowrap">Non-Aktif</button>
+                </div>
+
+                <div id="emp-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- 4. BONUS & KASBON (Simplified UI) -->
+            <div id="bonus" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold mb-4">Input Bonus</h2>
+                <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                    <div class="grid gap-4">
+                        <select id="bonus-emp" class="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500/50"></select>
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="date" id="bonus-date" class="p-3 bg-gray-50 rounded-xl border-none">
+                            <input type="number" id="bonus-amount" placeholder="Nominal (Rp)" class="p-3 bg-gray-50 rounded-xl border-none">
+                        </div>
+                        <input type="text" id="bonus-note" placeholder="Keterangan (e.g. THR)" class="p-3 bg-gray-50 rounded-xl border-none">
+                    </div>
+                    <button onclick="addBonus()" class="btn-press mt-4 w-full bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-green-500/30">Tambah Bonus</button>
+                </div>
+                <h3 class="font-bold text-gray-500 mb-3 text-sm uppercase">Riwayat Bonus</h3>
+                <div id="bonus-list" class="space-y-3"></div>
+            </div>
+
+            <div id="kasbon" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold mb-4">Input Kasbon</h2>
+                <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                    <div class="grid gap-4">
+                        <select id="kasbon-emp" class="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-red-500/50"></select>
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="date" id="kasbon-date" class="p-3 bg-gray-50 rounded-xl border-none">
+                            <input type="number" id="kasbon-amount" placeholder="Nominal (Rp)" class="p-3 bg-gray-50 rounded-xl border-none">
+                        </div>
+                        <input type="text" id="kasbon-note" placeholder="Keterangan" class="p-3 bg-gray-50 rounded-xl border-none">
+                    </div>
+                    <button onclick="addKasbon()" class="btn-press mt-4 w-full bg-red-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-500/30">Tambah Kasbon</button>
+                </div>
+                <h3 class="font-bold text-gray-500 mb-3 text-sm uppercase">Riwayat Kasbon</h3>
+                <div id="kasbon-list" class="space-y-3"></div>
+            </div>
+
+            <!-- 5. PAYROLL -->
+            <div id="payroll" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold mb-4">Penggajian</h2>
+                <div class="bg-white p-5 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-end">
+                    <div class="w-full">
+                        <label class="text-xs font-bold text-gray-400 uppercase">Dari Tanggal</label>
+                        <input type="date" id="pay-start" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1">
+                    </div>
+                    <div class="w-full">
+                        <label class="text-xs font-bold text-gray-400 uppercase">Sampai Tanggal</label>
+                        <input type="date" id="pay-end" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1">
+                    </div>
+                    <button onclick="calculatePayroll()" class="btn-press w-full md:w-auto bg-dark text-white px-6 py-3 rounded-xl font-bold shadow-lg"><i class="fa-solid fa-calculator mr-2"></i> Hitung</button>
+                </div>
+
+                <div id="payroll-result" class="hidden fade-enter">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg">Hasil Perhitungan</h3>
+                        <button onclick="exportFullPDF()" class="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 text-gray-500 font-medium border-b">
+                                    <tr>
+                                        <th class="p-4">Karyawan</th>
+                                        <th class="p-4 text-center">Hari</th>
+                                        <th class="p-4 text-right text-green-600">Bonus</th>
+                                        <th class="p-4 text-right text-red-600">Kasbon</th>
+                                        <th class="p-4 text-right font-bold">Total</th>
+                                        <th class="p-4 text-center">Slip</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="payroll-list" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. SETTINGS & OTHERS (Positions, Holidays, Profile, Backup) -->
+            <!-- Simplified for brevity, keeping functionality -->
+            <div id="positions" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold mb-4">Jabatan</h2>
+                <div class="bg-white p-5 rounded-2xl shadow-sm mb-4 grid gap-3">
+                    <input type="text" id="pos-title" placeholder="Nama Jabatan" class="p-3 bg-gray-50 rounded-xl border-none">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="number" id="pos-salary" placeholder="Gaji Pokok" class="p-3 bg-gray-50 rounded-xl border-none">
+                        <input type="number" id="pos-meal" placeholder="Uang Makan" class="p-3 bg-gray-50 rounded-xl border-none">
+                    </div>
+                    <button onclick="addPosition()" class="btn-press bg-primary text-white py-3 rounded-xl font-bold">Tambah Jabatan</button>
+                </div>
+                <div id="pos-list" class="space-y-3"></div>
+            </div>
+
+            <div id="holidays" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold mb-4">Hari Libur</h2>
+                <div class="bg-white p-5 rounded-2xl shadow-sm mb-4 flex gap-3">
+                    <input type="date" id="hol-date" class="w-full p-3 bg-gray-50 rounded-xl border-none">
+                    <select id="hol-type" class="p-3 bg-gray-50 rounded-xl border-none"><option value="paid">Dibayar</option><option value="unpaid">Tidak Dibayar</option></select>
+                    <button onclick="addHoliday()" class="bg-primary text-white px-4 rounded-xl"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="hol-list" class="space-y-3"></div>
+            </div>
+
+            <!-- Profile, Backup, Guide, About (Standard) -->
+            <div id="profile" class="section hidden page-enter"><div class="bg-white p-6 rounded-2xl shadow-sm"><h3 class="font-bold mb-4">Profil Usaha</h3><div class="grid gap-4"><input type="text" id="prof-name" placeholder="Nama Usaha" class="p-3 bg-gray-50 rounded-xl border-none"><input type="text" id="prof-owner" placeholder="Pemilik" class="p-3 bg-gray-50 rounded-xl border-none"><input type="text" id="prof-addr" placeholder="Alamat" class="p-3 bg-gray-50 rounded-xl border-none"><input type="text" id="prof-phone" placeholder="No HP" class="p-3 bg-gray-50 rounded-xl border-none"></div><button onclick="saveProfile()" class="mt-4 w-full bg-dark text-white py-3 rounded-xl font-bold">Simpan</button></div></div>
+            
+            <div id="backup" class="section hidden page-enter"><div class="bg-white p-6 rounded-2xl shadow-sm text-center"><i class="fa-solid fa-cloud-arrow-down text-4xl text-primary mb-4"></i><h3 class="font-bold">Backup & Restore</h3><p class="text-sm text-gray-500 mb-6">Simpan data Anda agar tidak hilang.</p><button onclick="downloadBackup()" class="w-full bg-primary text-white py-3 rounded-xl font-bold mb-4">Download Backup</button><div class="relative"><input type="file" id="restore-file" accept=".json" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="restoreBackup(event)"><button class="w-full bg-gray-100 text-gray-600 py-3 rounded-xl font-bold">Restore File</button></div></div></div>
+
+            <div id="menu_more" class="section hidden page-enter">
+                <h2 class="text-2xl font-bold mb-4">Menu Lainnya</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div onclick="nav('employees')" class="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center cursor-pointer active:scale-95 transition"><div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 mb-2 text-xl"><i class="fa-solid fa-users"></i></div><span class="font-bold text-sm">Karyawan</span></div>
+                    <div onclick="nav('bonus')" class="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center cursor-pointer active:scale-95 transition"><div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600 mb-2 text-xl"><i class="fa-solid fa-gift"></i></div><span class="font-bold text-sm">Bonus</span></div>
+                    <div onclick="nav('positions')" class="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center cursor-pointer active:scale-95 transition"><div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-2 text-xl"><i class="fa-solid fa-briefcase"></i></div><span class="font-bold text-sm">Jabatan</span></div>
+                    <div onclick="nav('holidays')" class="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center cursor-pointer active:scale-95 transition"><div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 mb-2 text-xl"><i class="fa-solid fa-calendar-day"></i></div><span class="font-bold text-sm">Libur</span></div>
+                    <div onclick="nav('profile')" class="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center cursor-pointer active:scale-95 transition"><div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 mb-2 text-xl"><i class="fa-solid fa-store"></i></div><span class="font-bold text-sm">Profil</span></div>
+                    <div onclick="nav('backup')" class="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center cursor-pointer active:scale-95 transition"><div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 mb-2 text-xl"><i class="fa-solid fa-database"></i></div><span class="font-bold text-sm">Backup</span></div>
+                    <div id="install-app-btn" class="hidden bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-2xl shadow-lg shadow-purple-500/30 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition col-span-2" onclick="installPWA()"><i class="fa-solid fa-download text-2xl mb-2"></i><span class="font-bold">Install Aplikasi</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EMP (Modern) -->
+    <div id="modal-emp" class="fixed inset-0 z-[100] hidden overflow-y-auto">
+        <div class="flex items-end md:items-center justify-center min-h-screen px-4 pb-4 md:p-0 text-center">
+            <div class="fixed inset-0 transition-opacity bg-gray-900/60 backdrop-blur-sm" onclick="closeEmpModal()"></div>
+            <div class="inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-2xl rounded-3xl relative z-[101] modal-enter">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-dark" id="modal-emp-title">Karyawan</h3>
+                    <button onclick="closeEmpModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"><i class="fa-solid fa-times"></i></button>
+                </div>
+                <input type="hidden" id="emp-id">
+                <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="text-xs font-bold text-gray-400">NIK</label><input type="text" id="emp-nik" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"></div>
+                        <div><label class="text-xs font-bold text-gray-400">Nama *</label><input type="text" id="emp-name" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="text-xs font-bold text-gray-400">Tgl Masuk *</label><input type="date" id="emp-join" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"></div>
+                        <div><label class="text-xs font-bold text-gray-400">Gender</label><select id="emp-gender" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="text-xs font-bold text-gray-400">Jabatan *</label><select id="emp-pos" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"></select></div>
+                        <div><label class="text-xs font-bold text-gray-400">Status</label><select id="emp-status" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"><option value="active">Aktif</option><option value="inactive">Non-Aktif</option></select></div>
+                    </div>
+                    <div><label class="text-xs font-bold text-gray-400">No. HP</label><input type="text" id="emp-phone" class="w-full p-3 bg-gray-50 rounded-xl border-none mt-1"></div>
+                    <div class="bg-blue-50 p-4 rounded-xl">
+                        <p class="text-xs font-bold text-blue-600 mb-2 uppercase">Info Rekening</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <input type="text" id="emp-bank-name" placeholder="Nama Bank" class="bg-white border-none rounded-lg text-sm p-2">
+                            <input type="text" id="emp-bank-acc" placeholder="No. Rekening" class="bg-white border-none rounded-lg text-sm p-2">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="saveEmployee()" class="btn-press mt-6 w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30">Simpan Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL (Modern) -->
+    <div id="modal-emp-detail" class="fixed inset-0 z-[100] hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-900/60 backdrop-blur-sm" onclick="closeDetailModal()"></div>
+            <div class="inline-block w-full max-w-sm p-6 my-8 overflow-hidden text-left align-middle bg-white shadow-2xl rounded-3xl relative z-[101] modal-enter">
+                <button onclick="closeDetailModal()" class="absolute top-4 right-4 text-gray-300 hover:text-gray-500"><i class="fa-solid fa-times text-xl"></i></button>
+                <div class="text-center mb-6">
+                    <div class="w-20 h-20 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 text-3xl font-bold text-white shadow-lg shadow-indigo-500/40" id="detail-avatar">A</div>
+                    <h3 class="text-xl font-bold text-gray-900" id="detail-name">-</h3>
+                    <p class="text-sm text-gray-500" id="detail-job">-</p>
+                    <span id="detail-status-badge" class="mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">Status</span>
+                </div>
+                <div class="space-y-3 text-sm border-t border-gray-100 pt-4">
+                    <div class="flex justify-between"><span>Bergabung</span><span class="font-medium text-dark" id="detail-join">-</span></div>
+                    <div class="flex justify-between"><span>Masa Kerja</span><span class="font-medium text-dark" id="detail-tenure">-</span></div>
+                    <div class="flex justify-between"><span>No. HP</span><span class="font-medium text-dark" id="detail-phone">-</span></div>
+                    <div class="bg-gray-50 p-3 rounded-xl mt-2">
+                        <div class="flex justify-between text-xs text-gray-500 mb-1"><span>Bank</span><span id="detail-bank">-</span></div>
+                        <div class="flex justify-between font-mono font-bold text-dark"><span>Rek</span><span id="detail-rek">-</span></div>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-xl">
+                        <div class="flex justify-between mb-1"><span class="text-green-700">Gaji Pokok</span><span class="font-bold text-green-700" id="detail-salary">0</span></div>
+                        <div class="flex justify-between"><span class="text-green-700">Uang Makan</span><span class="font-bold text-green-700" id="detail-meal">0</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAV (Glass) -->
+    <div class="bottom-nav fixed bottom-6 left-4 right-4 h-16 glass-dark rounded-2xl flex justify-around items-center px-2 text-gray-400 shadow-2xl z-50 md:hidden border border-white/10">
+        <div onclick="nav('dashboard')" class="nav-item-mobile flex flex-col items-center justify-center w-full h-full cursor-pointer transition active:scale-90"><i class="fa-solid fa-chart-pie text-xl mb-1"></i><span class="text-[9px] font-medium">Home</span></div>
+        <div onclick="nav('attendance')" class="nav-item-mobile flex flex-col items-center justify-center w-full h-full cursor-pointer transition active:scale-90"><i class="fa-solid fa-clipboard-user text-xl mb-1"></i><span class="text-[9px] font-medium">Absen</span></div>
+        <div onclick="nav('bonus')" class="nav-item-mobile flex flex-col items-center justify-center w-full h-full cursor-pointer transition active:scale-90"><i class="fa-solid fa-gift text-xl mb-1"></i><span class="text-[9px] font-medium">Bonus</span></div>
+        <div onclick="nav('payroll')" class="nav-item-mobile flex flex-col items-center justify-center w-full h-full cursor-pointer transition active:scale-90"><i class="fa-solid fa-file-invoice-dollar text-xl mb-1"></i><span class="text-[9px] font-medium">Gaji</span></div>
+        <div onclick="nav('menu_more')" class="nav-item-mobile flex flex-col items-center justify-center w-full h-full cursor-pointer transition active:scale-90"><i class="fa-solid fa-bars text-xl mb-1"></i><span class="text-[9px] font-medium">Menu</span></div>
+    </div>
+
+    <div id="print-area"></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- PWA & INIT ---
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); }); }
+        let deferredPrompt; const installBtn = document.getElementById('install-app-btn');
+        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; if(installBtn) installBtn.classList.remove('hidden'); });
+        async function installPWA() { if (!deferredPrompt) return; deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; deferredPrompt = null; if(outcome === 'accepted' && installBtn) installBtn.classList.add('hidden'); }
+
+        // --- DATA STORE ---
+        let db = {
+            positions: JSON.parse(localStorage.getItem('positions')) || [],
+            employees: JSON.parse(localStorage.getItem('employees')) || [],
+            holidays: JSON.parse(localStorage.getItem('holidays')) || [],
+            kasbon: JSON.parse(localStorage.getItem('kasbon')) || [],
+            bonuses: JSON.parse(localStorage.getItem('bonuses')) || [],
+            attendance: JSON.parse(localStorage.getItem('attendance')) || [],
+            profile: JSON.parse(localStorage.getItem('profile')) || { name: "My Company", owner: "Owner", address: "Indonesia", phone: "08123456789" }
+        };
+
+        const save = () => { for(let k in db) localStorage.setItem(k, JSON.stringify(db[k])); };
+        const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+        const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+        // --- NAVIGATION & UI UX ---
+        function nav(sectionId) {
+            document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
+            
+            // Active State for Bottom Nav
+            document.querySelectorAll('.nav-item-mobile').forEach(el => el.classList.remove('text-indigo-400', 'text-white'));
+            
+            if(sectionId === 'dashboard') { renderDashboard(); highlightNav(0); }
+            if(sectionId === 'attendance') { document.getElementById('att-date').value = new Date().toISOString().split('T')[0]; renderAttendanceForm(); highlightNav(1); }
+            if(sectionId === 'bonus') { renderBonuses(); updateSelectOptions(); highlightNav(2); }
+            if(sectionId === 'payroll') { highlightNav(3); }
+            if(sectionId === 'menu_more') { highlightNav(4); }
+            
+            if(sectionId === 'employees') renderEmployees();
+            if(sectionId === 'positions') renderPositions();
+            if(sectionId === 'holidays') renderHolidays();
+            if(sectionId === 'kasbon') { renderKasbon(); updateSelectOptions(); }
+            if(sectionId === 'profile') loadProfile();
+            
+            window.scrollTo(0,0);
+        }
+
+        function highlightNav(index) {
+            const navs = document.querySelectorAll('.nav-item-mobile');
+            if(navs[index]) navs[index].classList.add('text-indigo-400');
+        }
+
+        function updateSelectOptions() {
+            const activeEmps = db.employees.filter(e => (e.status || 'active') === 'active');
+            const options = '<option value="">Pilih Karyawan</option>' + activeEmps.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+            if(document.getElementById('kasbon-emp')) document.getElementById('kasbon-emp').innerHTML = options;
+            if(document.getElementById('bonus-emp')) document.getElementById('bonus-emp').innerHTML = options;
+        }
+
+        // --- ATTENDANCE ---
+        function switchAttTab(tab) {
+            document.getElementById('att-input-panel').classList.toggle('hidden', tab !== 'input');
+            document.getElementById('att-history-panel').classList.toggle('hidden', tab !== 'history');
+            document.getElementById('btn-att-input').className = "flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-medium transition-all " + (tab === 'input' ? "bg-primary text-white shadow-lg shadow-indigo-500/30" : "text-gray-500 hover:bg-gray-100");
+            document.getElementById('btn-att-history').className = "flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-medium transition-all " + (tab === 'history' ? "bg-primary text-white shadow-lg shadow-indigo-500/30" : "text-gray-500 hover:bg-gray-100");
+            if(tab === 'input') renderAttendanceForm(); else renderAttendanceHistory();
+        }
+
+        function renderAttendanceForm() {
+            const date = document.getElementById('att-date').value;
+            const activeEmps = db.employees.filter(e => (e.status || 'active') === 'active');
+            document.getElementById('att-form-list').innerHTML = activeEmps.map(emp => {
+                const exist = db.attendance.find(a => a.empId === emp.id && a.date === date);
+                const status = exist ? exist.status : 'hadir';
+                
+                // Color coding selection
+                let bgClass = "bg-white";
+                if(status === 'sakit') bgClass = "bg-blue-50 border-blue-200";
+                if(status === 'izin') bgClass = "bg-yellow-50 border-yellow-200";
+                if(status === 'alpha') bgClass = "bg-red-50 border-red-200";
+
+                return `
+                <div class="flex justify-between items-center p-3 rounded-xl border border-gray-100 ${bgClass} transition-colors">
+                    <div class="font-medium text-sm text-dark">${emp.name}</div>
+                    <select id="att-status-${emp.id}" onchange="this.parentElement.className='flex justify-between items-center p-3 rounded-xl border transition-colors ' + (this.value=='hadir'?'bg-white border-gray-100':(this.value=='sakit'?'bg-blue-50 border-blue-200':(this.value=='izin'?'bg-yellow-50 border-yellow-200':'bg-red-50 border-red-200')))" class="text-sm bg-transparent border-none font-medium text-gray-600 focus:ring-0 cursor-pointer">
+                        <option value="hadir" ${status==='hadir'?'selected':''}>Hadir</option>
+                        <option value="sakit" ${status==='sakit'?'selected':''}>Sakit</option>
+                        <option value="izin" ${status==='izin'?'selected':''}>Izin</option>
+                        <option value="alpha" ${status==='alpha'?'selected':''}>Alpha</option>
+                    </select>
+                </div>`;
+            }).join('');
+        }
+
+        function markAllPresent() {
+            const activeEmps = db.employees.filter(e => (e.status || 'active') === 'active');
+            activeEmps.forEach(emp => { if(document.getElementById(`att-status-${emp.id}`)) {
+                const el = document.getElementById(`att-status-${emp.id}`);
+                el.value = 'hadir';
+                el.parentElement.className = 'flex justify-between items-center p-3 rounded-xl border border-gray-100 bg-white transition-colors';
+            }});
+        }
+
+        function saveAttendance() {
+            const date = document.getElementById('att-date').value;
+            if(!date) return alert('Pilih tanggal');
+            db.attendance = db.attendance.filter(a => a.date !== date);
+            const activeEmps = db.employees.filter(e => (e.status || 'active') === 'active');
+            activeEmps.forEach(emp => {
+                const status = document.getElementById(`att-status-${emp.id}`).value;
+                db.attendance.push({ id: generateId(), date, empId: emp.id, status });
+            });
+            save(); alert('Absensi Tersimpan!');
+        }
+
+        function renderAttendanceHistory() {
+            let start = document.getElementById('hist-start').value;
+            let end = document.getElementById('hist-end').value;
+            if(!start) {
+                const d = new Date();
+                start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+                end = new Date().toISOString().split('T')[0];
+                document.getElementById('hist-start').value = start; document.getElementById('hist-end').value = end;
+            }
+            const filtered = db.attendance.filter(a => a.date >= start && a.date <= end).sort((a,b)=>b.date.localeCompare(a.date));
+            document.getElementById('att-hist-list').innerHTML = filtered.map(a => {
+                const emp = db.employees.find(e => e.id === a.empId) || {name:'?'};
+                let statusBadge = `<span class="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600">Hadir</span>`;
+                if(a.status === 'sakit') statusBadge = `<span class="px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-600">Sakit</span>`;
+                if(a.status === 'izin') statusBadge = `<span class="px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-600">Izin</span>`;
+                if(a.status === 'alpha') statusBadge = `<span class="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-600">Alpha</span>`;
+
+                return `
+                <div class="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div>
+                        <div class="text-[10px] text-gray-400 font-bold">${a.date}</div>
+                        <div class="font-medium text-sm text-dark">${emp.name}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        ${statusBadge}
+                        <button onclick="deleteItem('attendance','${a.id}')" class="text-gray-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // --- DASHBOARD RENDER ---
+        function renderDashboard() {
+            document.getElementById('header-date').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+            if(document.getElementById('stat-total-emp')) document.getElementById('stat-total-emp').innerText = db.employees.filter(e => (e.status || 'active') === 'active').length;
+            const today = new Date().toISOString().split('T')[0];
+            if(document.getElementById('stat-today-att')) document.getElementById('stat-today-att').innerText = db.attendance.filter(a => a.date === today && a.status === 'hadir').length;
+
+            let start = document.getElementById('dash-start').value;
+            let end = document.getElementById('dash-end').value;
+            if(!start) {
+                const d = new Date();
+                start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+                end = new Date().toISOString().split('T')[0];
+                document.getElementById('dash-start').value = start; document.getElementById('dash-end').value = end;
+            }
+            
+            const totalKasbon = db.kasbon.filter(k => k.date >= start && k.date <= end).reduce((sum, k) => sum + k.amount, 0);
+            if(document.getElementById('stat-total-kasbon')) document.getElementById('stat-total-kasbon').innerText = formatRp(totalKasbon);
+            const totalBonus = db.bonuses.filter(b => b.date >= start && b.date <= end).reduce((sum, b) => sum + b.amount, 0);
+            if(document.getElementById('stat-total-bonus')) document.getElementById('stat-total-bonus').innerText = formatRp(totalBonus);
+        }
+
+        // --- EMPLOYEE MANAGEMENT (Card Style) ---
+        function openEmpModal(mode, id = null) {
+            const modal = document.getElementById('modal-emp');
+            modal.classList.remove('hidden');
+            const posSelect = document.getElementById('emp-pos');
+            posSelect.innerHTML = db.positions.length ? '<option value="">Pilih Jabatan</option>' + db.positions.map(p => `<option value="${p.id}">${p.title}</option>`).join('') : '<option value="">-- Buat Jabatan Dulu --</option>';
+
+            if(mode === 'edit' && id) {
+                const emp = db.employees.find(e => e.id === id);
+                if(emp) {
+                    document.getElementById('modal-emp-title').innerText = "Edit Karyawan";
+                    document.getElementById('emp-id').value = emp.id;
+                    document.getElementById('emp-nik').value = emp.nik || '';
+                    document.getElementById('emp-name').value = emp.name;
+                    document.getElementById('emp-join').value = emp.join;
+                    document.getElementById('emp-gender').value = emp.gender || 'L';
+                    document.getElementById('emp-pos').value = emp.posId;
+                    document.getElementById('emp-status').value = emp.status || 'active';
+                    document.getElementById('emp-phone').value = emp.phone;
+                    document.getElementById('emp-addr').value = emp.addr;
+                    document.getElementById('emp-bank-name').value = emp.bankName || '';
+                    document.getElementById('emp-bank-acc').value = emp.bankAcc || '';
+                }
+            } else {
+                document.getElementById('modal-emp-title').innerText = "Tambah Karyawan";
+                document.getElementById('emp-id').value = '';
+                document.querySelectorAll('#modal-emp input').forEach(i => i.value = '');
+                document.getElementById('emp-status').value = 'active';
+            }
+        }
+        function closeEmpModal() { document.getElementById('modal-emp').classList.add('hidden'); }
+
+        function saveEmployee() {
+            const id = document.getElementById('emp-id').value;
+            const data = {
+                id: id || generateId(),
+                nik: document.getElementById('emp-nik').value,
+                name: document.getElementById('emp-name').value,
+                join: document.getElementById('emp-join').value,
+                gender: document.getElementById('emp-gender').value,
+                posId: document.getElementById('emp-pos').value,
+                status: document.getElementById('emp-status').value,
+                phone: document.getElementById('emp-phone').value,
+                addr: document.getElementById('emp-addr').value,
+                bankName: document.getElementById('emp-bank-name').value,
+                bankAcc: document.getElementById('emp-bank-acc').value
+            };
+            if (!data.name || !data.posId || !data.join) return alert('Nama, Jabatan, dan Tgl Masuk wajib diisi');
+            if(id) { const idx = db.employees.findIndex(e => e.id === id); if(idx !== -1) db.employees[idx] = data; } 
+            else { db.employees.push(data); }
+            save(); renderEmployees(); closeEmpModal();
+        }
+
+        function renderEmployees() {
+            const search = document.getElementById('emp-search').value.toLowerCase();
+            // Filter logic here if needed (omitted for brevity, assume all)
+            const filtered = db.employees.filter(e => e.name.toLowerCase().includes(search));
+
+            document.getElementById('emp-list').innerHTML = filtered.map(e => {
+                const pos = db.positions.find(p => p.id === e.posId) || { title: '?' };
+                const isActive = (e.status || 'active') === 'active';
+                const statusDot = isActive ? 'bg-green-500' : 'bg-red-500';
+                
+                return `
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition">
+                    <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-bl-full -mr-4 -mt-4"></div>
+                    <div class="flex items-center gap-4 mb-3">
+                        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg">${e.name.charAt(0)}</div>
+                        <div>
+                            <h4 class="font-bold text-dark text-sm">${e.name}</h4>
+                            <p class="text-xs text-gray-500">${pos.title}</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-gray-50 pt-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full ${statusDot}"></div>
+                            <span class="text-xs text-gray-400 font-medium">${isActive?'Aktif':'Non-Aktif'}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="viewEmployee('${e.id}')" class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100"><i class="fa-solid fa-eye text-xs"></i></button>
+                            <button onclick="openEmpModal('edit', '${e.id}')" class="w-8 h-8 rounded-lg bg-yellow-50 text-yellow-600 flex items-center justify-center hover:bg-yellow-100"><i class="fa-solid fa-pen text-xs"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            updateSelectOptions();
+        }
+
+        function viewEmployee(id) {
+            const emp = db.employees.find(e => e.id === id); if(!emp) return;
+            const pos = db.positions.find(p => p.id === emp.posId) || { title: '-', salary: 0, meal: 0 };
+            const diff = Math.ceil(Math.abs(new Date() - new Date(emp.join)) / (1000 * 60 * 60 * 24));
+            const tenure = diff > 365 ? `${Math.floor(diff/365)} tahun` : `${diff} hari`;
+            const isActive = (emp.status || 'active') === 'active';
+
+            document.getElementById('detail-avatar').innerText = emp.name.charAt(0);
+            document.getElementById('detail-name').innerText = emp.name;
+            document.getElementById('detail-job').innerText = pos.title;
+            const badge = document.getElementById('detail-status-badge');
+            badge.innerText = isActive ? 'Aktif' : 'Non-Aktif';
+            badge.className = isActive ? 'mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-green-100 text-green-700' : 'mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-700';
+
+            document.getElementById('detail-join').innerText = emp.join;
+            document.getElementById('detail-tenure').innerText = tenure;
+            document.getElementById('detail-phone').innerText = emp.phone || '-';
+            document.getElementById('detail-bank').innerText = emp.bankName || '-';
+            document.getElementById('detail-rek').innerText = emp.bankAcc || '-';
+            document.getElementById('detail-salary').innerText = formatRp(pos.salary);
+            document.getElementById('detail-meal').innerText = formatRp(pos.meal);
+            document.getElementById('modal-emp-detail').classList.remove('hidden');
+        }
+        function closeDetailModal() { document.getElementById('modal-emp-detail').classList.add('hidden'); }
+
+        // --- PAYROLL & OTHERS (Standard Logic) ---
+        let payrollData = [];
+        function calculatePayroll() {
+            const start = document.getElementById('pay-start').value;
+            const end = document.getElementById('pay-end').value;
+            if(!start || !end) return alert('Pilih rentang tanggal');
+            const activeEmps = db.employees.filter(e => (e.status || 'active') === 'active');
+            payrollData = activeEmps.map(emp => {
+                const pos = db.positions.find(p => p.id === emp.posId) || { salary: 0, meal: 0, title: '' };
+                const presentDates = db.attendance.filter(a => a.empId === emp.id && a.date >= start && a.date <= end && a.status === 'hadir').map(a => a.date);
+                const paidHolidayDates = db.holidays.filter(h => h.date >= start && h.date <= end && h.type === 'paid').map(h => h.date);
+                const uniquePaidDays = new Set([...presentDates, ...paidHolidayDates]);
+                const totalPaidDays = uniquePaidDays.size;
+                const empKasbon = db.kasbon.filter(k => k.empId === emp.id && k.date >= start && k.date <= end).reduce((sum, k) => sum + k.amount, 0);
+                const empBonus = db.bonuses.filter(b => b.empId === emp.id && b.date >= start && b.date <= end).reduce((sum, b) => sum + b.amount, 0);
+                const basicTotal = totalPaidDays * pos.salary;
+                const mealTotal = totalPaidDays * pos.meal;
+                const gross = basicTotal + mealTotal;
+                const net = gross + empBonus - empKasbon;
+                return { emp, pos, paidDays: totalPaidDays, gross, kasbon: empKasbon, bonus: empBonus, net, start, end };
+            });
+            renderPayrollTable();
+        }
+
+        function renderPayrollTable() {
+            document.getElementById('payroll-result').classList.remove('hidden');
+            document.getElementById('payroll-list').innerHTML = payrollData.map((d, index) => `
+                <tr class="border-b hover:bg-gray-50"><td class="p-4 font-bold text-dark">${d.emp.name}<br><span class="text-xs font-normal text-gray-400">${d.pos.title}</span></td><td class="p-4 text-center font-bold text-gray-600">${d.paidDays}</td><td class="p-4 text-right text-green-600 font-bold text-xs">${formatRp(d.bonus)}</td><td class="p-4 text-right text-red-600 font-bold text-xs">${formatRp(d.kasbon)}</td><td class="p-4 text-right font-bold text-indigo-900">${formatRp(d.net)}</td><td class="p-4 text-center"><button onclick="printSlip(${index})" class="bg-dark text-white w-8 h-8 rounded-lg shadow-lg shadow-indigo-500/30 flex items-center justify-center mx-auto"><i class="fa-solid fa-print text-xs"></i></button></td></tr>
+            `).join('');
+        }
+
+        // --- GENERIC CRUD ---
+        function addPosition() { const t=document.getElementById('pos-title').value, s=Number(document.getElementById('pos-salary').value), m=Number(document.getElementById('pos-meal').value); if(!t)return alert('Wajib'); db.positions.push({id:generateId(),title:t,salary:s,meal:m}); save(); renderPositions(); document.getElementById('pos-title').value=''; }
+        function renderPositions() { document.getElementById('pos-list').innerHTML = db.positions.map(p => `<div class="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center shadow-sm"><div class="font-bold text-dark">${p.title}</div><div class="text-xs text-gray-500 text-right">Gaji: ${formatRp(p.salary)}<br>Makan: ${formatRp(p.meal)}</div><button onclick="deleteItem('positions','${p.id}')" class="text-gray-300 hover:text-red-500 ml-4"><i class="fa-solid fa-trash"></i></button></div>`).join(''); }
+        
+        function addBonus() { const i=document.getElementById('bonus-emp').value, d=document.getElementById('bonus-date').value, a=Number(document.getElementById('bonus-amount').value), n=document.getElementById('bonus-note').value; if(!i||!a)return alert('Lengkapi'); db.bonuses.push({id:generateId(),empId:i,date:d,amount:a,note:n}); save(); renderBonuses(); }
+        function renderBonuses() { document.getElementById('bonus-list').innerHTML = db.bonuses.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(b => { const e=db.employees.find(x=>x.id===b.empId)||{name:'?'}; return `<div class="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center"><div><div class="text-[10px] text-gray-400 font-bold">${b.date}</div><div class="font-medium text-sm text-dark">${e.name} <span class="text-xs text-green-500">(${b.note})</span></div></div><div class="flex items-center gap-3"><span class="font-bold text-green-600">${formatRp(b.amount)}</span><button onclick="deleteItem('bonuses','${b.id}')" class="text-gray-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button></div></div>`; }).join(''); }
+
+        function addKasbon() { const i=document.getElementById('kasbon-emp').value, d=document.getElementById('kasbon-date').value, a=Number(document.getElementById('kasbon-amount').value), n=document.getElementById('kasbon-note').value; if(!i||!a)return alert('Lengkapi'); db.kasbon.push({id:generateId(),empId:i,date:d,amount:a,note:n}); save(); renderKasbon(); }
+        function renderKasbon() { document.getElementById('kasbon-list').innerHTML = db.kasbon.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(k => { const e=db.employees.find(x=>x.id===k.empId)||{name:'?'}; return `<div class="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center"><div><div class="text-[10px] text-gray-400 font-bold">${k.date}</div><div class="font-medium text-sm text-dark">${e.name} <span class="text-xs text-red-400">(${k.note})</span></div></div><div class="flex items-center gap-3"><span class="font-bold text-red-600">${formatRp(k.amount)}</span><button onclick="deleteItem('kasbon','${k.id}')" class="text-gray-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button></div></div>`; }).join(''); }
+
+        function addHoliday() { const d=document.getElementById('hol-date').value, t=document.getElementById('hol-type').value; if(!d)return; db.holidays.push({id:generateId(),date:d,type:t}); save(); renderHolidays(); }
+        function renderHolidays() { document.getElementById('hol-list').innerHTML = db.holidays.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(h => `<div class="bg-white p-3 rounded-xl border border-gray-100 flex justify-between items-center shadow-sm"><div><div class="font-bold text-dark">${h.date}</div><span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded ${h.type==='paid'?'bg-green-100 text-green-600':'bg-red-100 text-red-600'}">${h.type==='paid'?'Dibayar':'Libur'}</span></div><button onclick="deleteItem('holidays','${h.id}')" class="text-gray-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button></div>`).join(''); }
+
+        function deleteItem(type, id) { if(confirm('Hapus?')) { db[type] = db[type].filter(i => i.id !== id); save(); nav(type === 'employees' ? 'employees' : (type === 'attendance' ? 'attendance' : (type === 'bonuses' ? 'bonus' : type))); if(type==='positions') renderPositions(); if(type==='employees') renderEmployees(); if(type==='kasbon') renderKasbon(); if(type==='bonuses') renderBonuses(); if(type==='holidays') renderHolidays(); if(type==='attendance') renderAttendanceHistory(); } }
+
+        function saveProfile() { db.profile = { name: document.getElementById('prof-name').value, owner: document.getElementById('prof-owner').value, address: document.getElementById('prof-addr').value, phone: document.getElementById('prof-phone').value }; save(); alert('Tersimpan'); }
+        function loadProfile() { document.getElementById('prof-name').value = db.profile.name; document.getElementById('prof-owner').value = db.profile.owner; document.getElementById('prof-addr').value = db.profile.address; document.getElementById('prof-phone').value = db.profile.phone; }
+        function downloadBackup() { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db)); a.download = "backup_payroll_" + new Date().toISOString().slice(0,10) + ".json"; a.click(); }
+        function restoreBackup(event) { const r = new FileReader(); r.onload = e => { try { db = JSON.parse(e.target.result); save(); alert("Restore Sukses"); location.reload(); } catch(err) { alert("File rusak"); } }; r.readAsText(event.target.files[0]); }
+
+        function printSlip(index) {
+            const data = payrollData[index]; const p = db.profile; const dateNow = new Date().toLocaleString('id-ID');
+            const html = `<div style="width: 58mm; padding: 10px; font-family: monospace; font-size: 12px; line-height: 1.2;"><div style="text-align:center; font-weight:bold; font-size: 14px; margin-bottom:5px;">${p.name}</div><div style="text-align:center; font-size:10px; margin-bottom:10px; border-bottom: 1px dashed black; padding-bottom: 5px;">${p.address}<br>${p.phone}</div><div style="margin: 10px 0; font-weight: bold;">SLIP GAJI<br>Karyawan: ${data.emp.name}<br>Periode: ${data.start} - ${data.end}</div><table style="width:100%; font-size:12px;"><tr><td>Gaji (${data.paidDays}x)</td><td style="text-align:right;">${formatRp(data.paidDays * data.pos.salary)}</td></tr><tr><td>Makan</td><td style="text-align:right;">${formatRp(data.paidDays * data.pos.meal)}</td></tr><tr><td>Bonus</td><td style="text-align:right;">${formatRp(data.bonus)}</td></tr><tr><td>Kasbon</td><td style="text-align:right;">-${formatRp(data.kasbon)}</td></tr></table><div style="border-top: 1px solid black; margin: 10px 0; padding-top: 5px; display:flex; justify-content:space-between; font-weight:bold; font-size: 14px;"><span>TOTAL</span><span>${formatRp(data.net)}</span></div><div style="text-align:center; font-size:10px; margin-top:20px;">${dateNow}</div><br></div>`;
+            document.getElementById('print-area').innerHTML = html; setTimeout(() => { window.print(); }, 500);
+        }
+
+        function exportFullPDF() {
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            doc.text(`Laporan Gaji: ${db.profile.name}`, 14, 15); doc.setFontSize(10); doc.text(`Periode: ${document.getElementById('pay-start').value} s/d ${document.getElementById('pay-end').value}`, 14, 22);
+            const rows = payrollData.map(d => [d.emp.name, d.pos.title, d.paidDays + " Hari", formatRp(d.gross), formatRp(d.bonus), formatRp(d.kasbon), formatRp(d.net)]);
+            doc.autoTable({ head: [["Nama", "Jabatan", "Hari Kerja", "Gaji Bruto", "Bonus", "Kasbon", "Total Terima"]], body: rows, startY: 30 });
+            doc.save(`Laporan_Gaji_${Date.now()}.pdf`);
+        }
+
+        // Init App
+        nav('dashboard');
+    </script>
+</body>
+</html>
